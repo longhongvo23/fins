@@ -1,0 +1,569 @@
+/*
+ * ===================================================================
+ * FINAL BLUEPRINT - STOCK APP MICROSERVICES
+ * ===================================================================
+ */
+
+/*
+ * ===================================================================
+ * 1. APPLICATIONS
+ * ===================================================================
+ */
+
+application {
+  config {
+    baseName gateway
+    applicationType gateway
+    packageName com.stockapp.gateway
+    serverPort 8080
+    databaseType mongodb
+    authenticationType jwt
+    buildTool maven
+    reactive true
+    serviceDiscoveryType consul
+    messageBroker kafka
+    clientFramework angular
+    skipUserManagement true
+  }
+  // No entities - pure API Gateway
+}
+
+application {
+  config {
+    baseName userservice
+    applicationType microservice
+    packageName com.stockapp.userservice
+    serverPort 8081
+    databaseType mongodb
+    buildTool maven
+    reactive true
+    serviceDiscoveryType consul
+    authenticationType jwt
+    messageBroker kafka
+    skipClient true
+  }
+  entities AppUser, Authority, UserProfile, Session, WatchlistItem, NotificationSetting, RefreshToken, LoginHistory, PasswordHistory
+}
+
+application {
+  config {
+    baseName notificationservice
+    applicationType microservice
+    packageName com.stockapp.notificationservice
+    serverPort 8082
+    databaseType mongodb
+    buildTool maven
+    reactive true
+    serviceDiscoveryType consul
+    authenticationType jwt
+    messageBroker kafka
+    skipClient true
+  }
+  entities Notification
+}
+
+application {
+  config {
+    baseName stockservice
+    applicationType microservice
+    packageName com.stockapp.stockservice
+    serverPort 8083
+    databaseType mongodb
+    buildTool maven
+    reactive true
+    serviceDiscoveryType consul
+    authenticationType jwt
+    messageBroker kafka
+    skipClient true
+  }
+  entities Company, IntradayQuote, HistoricalPrice, StockStatistics, Financial, Recommendation, PeerCompany
+}
+
+application {
+  config {
+    baseName newsservice
+    applicationType microservice
+    packageName com.stockapp.newsservice
+    serverPort 8084
+    databaseType mongodb
+    buildTool maven
+    reactive true
+    serviceDiscoveryType consul
+    authenticationType jwt
+    messageBroker kafka
+    skipClient true
+  }
+  entities CompanyRef, CompanyNews, NewsEntity
+}
+
+application {
+  config {
+    baseName crawlservice
+    applicationType microservice
+    packageName com.stockapp.crawlservice
+    serverPort 8085
+    databaseType mongodb
+    buildTool maven
+    reactive true
+    serviceDiscoveryType consul
+    authenticationType jwt
+    messageBroker kafka
+    skipClient true
+  }
+  entities CrawlJobState
+}
+
+/*
+ * ===================================================================
+ * 2. DEPLOYMENT
+ * ===================================================================
+ */
+
+deployment {
+  deploymentType docker-compose
+  appsFolders [gateway, userservice, notificationservice, stockservice, newsservice, crawlservice]
+  dockerRepositoryName "stockapp"
+  serviceDiscoveryType consul
+  gatewayType SpringCloudGateway
+  monitoring prometheus
+}
+
+/*
+ * ===================================================================
+ * 3. ENUMS
+ * ===================================================================
+ */
+
+enum FinancialStatementType { BS,
+  IC,
+  CF
+}
+enum FrequencyType { ANNUAL,
+  QUARTERLY
+}
+enum NotificationType { EMAIL,
+  PUSH,
+  SMS,
+  IN_APP
+}
+enum NotificationStatus { PENDING,
+  SENT,
+  FAILED
+}
+enum JobStatus { RUNNING,
+  SUCCEEDED,
+  FAILED,
+  PAUSED
+}
+enum AccountStatus { ACTIVE,
+  INACTIVE,
+  LOCKED,
+  SUSPENDED,
+  PENDING_VERIFICATION
+}
+enum SessionStatus { ACTIVE,
+  EXPIRED,
+  REVOKED,
+  LOGGED_OUT
+}
+enum DeviceType { WEB,
+  MOBILE_IOS,
+  MOBILE_ANDROID,
+  TABLET,
+  DESKTOP_APP
+}
+enum LoginMethod { PASSWORD,
+  TWO_FACTOR,
+  REFRESH_TOKEN,
+  SSO
+}
+
+/*
+ * ===================================================================
+ * 4. ENTITIES
+ * ===================================================================
+ */
+
+/* ----------------- User Service Entities ----------------- */
+entity AppUser {
+  login String required unique minlength(3),
+  password String required minlength(4),
+  email String required unique pattern(/^[^@\s]+@[^@\s]+\.[^@\s]+$/),
+  activated Boolean required,
+  accountStatus AccountStatus required,
+  emailVerified Boolean required,
+  
+  // Timestamps
+  createdDate Instant required,
+  lastModifiedDate Instant,
+  lastLoginDate Instant,
+  lastPasswordChangeDate Instant,
+  
+  // Security
+  failedLoginAttempts Integer min(0) max(10),
+  accountLockedUntil Instant,
+  passwordResetToken String maxlength(100),
+  passwordResetTokenExpiry Instant,
+  emailVerificationToken String maxlength(100),
+  emailVerificationTokenExpiry Instant,
+  
+  // Two-Factor Authentication
+  twoFactorEnabled Boolean required,
+  twoFactorSecret String maxlength(64),
+  
+  // Tracking
+  lastLoginIp String maxlength(45),
+  language String maxlength(10),
+  timezone String maxlength(50)
+}
+
+entity Authority {
+  name String required unique,
+  description String maxlength(500),
+  createdDate Instant,
+  createdBy String maxlength(50),
+  isSystem Boolean required
+}
+
+entity UserProfile {
+  phoneNumber String pattern(/^[0-9\-\+]{9,15}$/),
+  phoneVerified Boolean,
+  country String maxlength(100),
+  fullName String maxlength(200),
+  avatarUrl String maxlength(2048),
+  
+  // Additional Info
+  dateOfBirth LocalDate,
+  bio String maxlength(500),
+  
+  // Privacy Settings
+  profileVisibility String maxlength(20),
+  showEmail Boolean,
+  showPhone Boolean
+}
+
+entity Session {
+  sessionId String required unique maxlength(100),
+  token String required maxlength(500),
+  refreshToken String maxlength(500),
+  
+  // Session Info
+  ipAddress String maxlength(45),
+  userAgent String maxlength(1024),
+  loginTime Instant required,
+  expiryTime Instant required,
+  lastActivityTime Instant,
+  
+  // Device Tracking
+  deviceId String maxlength(100),
+  deviceName String maxlength(200),
+  deviceType DeviceType,
+  osName String maxlength(50),
+  osVersion String maxlength(50),
+  browserName String maxlength(50),
+  browserVersion String maxlength(50),
+  
+  // Security
+  status SessionStatus required,
+  isTrustedDevice Boolean,
+  location String maxlength(200),
+  logoutTime Instant,
+  revokedAt Instant,
+  revokedReason String maxlength(500)
+}
+
+entity WatchlistItem {
+  symbol String required pattern(/^[A-Z0-9\.]+$/),
+  addedAt Instant required,
+  notes String maxlength(500)
+  // userId will be set via relationship to AppUser
+}
+
+entity NotificationSetting {
+  emailEnabled Boolean required,
+  smsEnabled Boolean required,
+  pushEnabled Boolean required,
+  inAppEnabled Boolean required
+}
+
+entity LoginHistory {
+  loginTime Instant required,
+  loginMethod LoginMethod required,
+  ipAddress String maxlength(45),
+  userAgent String maxlength(1024),
+  deviceType DeviceType,
+  location String maxlength(200),
+  successful Boolean required,
+  failureReason String maxlength(500)
+}
+
+entity PasswordHistory {
+  passwordHash String required maxlength(100),
+  changedDate Instant required,
+  changedBy String maxlength(50),
+  changeReason String maxlength(500)
+}
+
+entity RefreshToken {
+  token String required unique maxlength(500),
+  expiryDate Instant required,
+  createdDate Instant required,
+  usedDate Instant,
+  ipAddress String maxlength(45),
+  userAgent String maxlength(1024),
+  deviceId String maxlength(100),
+  revoked Boolean required,
+  revokedDate Instant,
+  revokedReason String maxlength(500),
+  replacedByToken String maxlength(500)
+}
+
+/* ----------------- Notification Service Entities ----------------- */
+entity Notification {
+  recipient String required,
+  type NotificationType required,
+  status NotificationStatus required,
+  subject String,
+  content TextBlob required,
+  createdAt Instant required,
+  sentAt Instant,
+  errorMessage String
+}
+
+/* ----------------- Stock Service Entities ----------------- */
+
+/*
+ * Company - Core entity for stock information
+ * 
+ * Relationships:
+ * - Has many HistoricalPrice (OneToMany)
+ * - Has many Financial statements (OneToMany)
+ * - Has many Recommendation (OneToMany)
+ * - Has many PeerCompany (OneToMany)
+ * 
+ * Cross-service references:
+ * - IntradayQuote: Independent entity, linked by 'symbol' field
+ * - StockStatistics: Independent entity, linked by 'symbol' field
+ * - WatchlistItem (UserService): References via 'symbol' field
+ * - CompanyRef (NewsService): Synced via Kafka events
+ * - CrawlJobState (CrawlService): References via 'symbol' field
+ */
+entity Company {
+  symbol String required unique pattern(/^[A-Z0-9\.]+$/),
+  name String required,
+  country String,
+  currency String,
+  exchange String,
+  finnhubIndustry String,
+  ipo LocalDate,
+  logo String maxlength(2048),
+  marketCapitalization BigDecimal min(0),
+  shareOutstanding BigDecimal min(0),
+  weburl String maxlength(2048),
+  phone String
+}
+
+entity IntradayQuote {
+  symbol String required unique pattern(/^[A-Z0-9\.]+$/),
+  name String,
+  exchange String,
+  micCode String,
+  currency String,
+  datetime String required,
+  timestamp Long required,
+  lastQuoteAt Long,
+  open BigDecimal required min(0),
+  high BigDecimal required min(0),
+  low BigDecimal required min(0),
+  close BigDecimal required min(0),
+  volume Long required min(0),
+  previousClose BigDecimal min(0),
+  change BigDecimal,
+  percentChange BigDecimal,
+  averageVolume Long min(0),
+  isMarketOpen Boolean,
+  updatedAt Instant required
+  // Independent entity - no FK to Company
+  // Linked by 'symbol' field for queries
+}
+
+entity HistoricalPrice {
+  symbol String required pattern(/^[A-Z0-9\.]+$/),
+  datetime String required,
+  interval String required,
+  open BigDecimal required min(0),
+  high BigDecimal required min(0),
+  low BigDecimal required min(0),
+  close BigDecimal required min(0),
+  volume Long required min(0)
+}
+
+entity StockStatistics {
+  symbol String required unique pattern(/^[A-Z0-9\.]+$/),
+  averageVolume Long min(0),
+  rolling1dChange BigDecimal,
+  rolling7dChange BigDecimal,
+  rollingChange BigDecimal,
+  fiftyTwoWeekLow BigDecimal min(0),
+  fiftyTwoWeekHigh BigDecimal min(0),
+  fiftyTwoWeekLowChange BigDecimal,
+  fiftyTwoWeekHighChange BigDecimal,
+  fiftyTwoWeekLowChangePercent BigDecimal,
+  fiftyTwoWeekHighChangePercent BigDecimal,
+  fiftyTwoWeekRange String,
+  extendedChange BigDecimal,
+  extendedPercentChange BigDecimal,
+  extendedPrice BigDecimal,
+  extendedTimestamp Long,
+  updatedAt Instant required
+  // Independent entity - no FK to Company
+  // Linked by 'symbol' field for queries
+}
+
+entity Financial {
+  symbol String required pattern(/^[A-Z0-9\.]+$/),
+  year Integer required min(1900),
+  frequency FrequencyType required,
+  statementType FinancialStatementType required,
+  totalAssets BigDecimal,
+  totalLiabilities BigDecimal,
+  totalEquity BigDecimal,
+  revenue BigDecimal,
+  netIncome BigDecimal,
+  operatingCashFlow BigDecimal,
+  filingDate LocalDate,
+  fiscalDateEnding LocalDate
+  // Composite key: symbol + year + frequency + statementType
+}
+
+entity PeerCompany {
+  peerSymbol String required
+}
+
+entity Recommendation {
+  period LocalDate required,
+  buy Integer min(0),
+  hold Integer min(0),
+  sell Integer min(0),
+  strongBuy Integer min(0),
+  strongSell Integer min(0)
+}
+
+/* ----------------- News Service Entities ----------------- */
+entity CompanyRef {
+  symbol String required unique pattern(/^[A-Z0-9\.]+$/),
+  name String
+}
+
+entity CompanyNews {
+  uuid String required unique,
+  title String required,
+  description TextBlob,
+  snippet TextBlob,
+  url String required maxlength(2048),
+  imageUrl String maxlength(2048),
+  language String,
+  publishedAt Instant required,
+  source String required,
+  keywords String,
+  relevanceScore BigDecimal
+}
+
+entity NewsEntity {
+  newsUuid String required,
+  symbol String required pattern(/^[A-Z0-9\.]+$/),
+  name String,
+  exchange String,
+  country String,
+  type String,
+  industry String,
+  matchScore BigDecimal,
+  sentimentScore BigDecimal
+}
+
+/* ----------------- Crawl Service Entities ----------------- */
+entity CrawlJobState {
+  symbol String required unique,
+  lastSuccessfulTimestamp Instant,
+  lastSyncStatus JobStatus,
+  errorLog TextBlob
+}
+
+/*
+ * ===================================================================
+ * 5. RELATIONSHIPS
+ * ===================================================================
+ */
+
+/*
+ * ╔════════════════════════════════════════════════════════════════╗
+ * ║  MICROSERVICES ARCHITECTURE PATTERN                            ║
+ * ║  ------------------------------------------------------------ ║
+ * ║  ✅ SAME SERVICE: Use JPA/MongoDB relationships                ║
+ * ║  ❌ CROSS SERVICE: Use symbol/id references ONLY               ║
+ * ║                                                                ║
+ * ║  Communication between services:                               ║
+ * ║  1. Event-driven (Kafka) - Recommended                         ║
+ * ║  2. REST API (WebClient) - For queries                         ║
+ * ║  3. CQRS + Local cache - For performance                       ║
+ * ╚════════════════════════════════════════════════════════════════╝
+ */
+
+// =====================================================================
+// USER SERVICE - Internal Relationships Only
+// =====================================================================
+relationship ManyToOne {
+  Session{user(login)} to AppUser,
+  WatchlistItem{user(login)} to AppUser,
+  LoginHistory{user(login)} to AppUser,
+  PasswordHistory{user(login)} to AppUser,
+  RefreshToken{user(login)} to AppUser
+}
+
+relationship ManyToMany {
+  AppUser{authorities(name)} to Authority{users(login)}
+}
+
+relationship OneToOne {
+  UserProfile{user(login)} to AppUser{profile},
+  NotificationSetting{user(login)} to AppUser{notificationSetting}
+}
+
+// =====================================================================
+// STOCK SERVICE - Internal Relationships Only
+// =====================================================================
+// Note: All entities store 'symbol' as String field for cross-references
+// No foreign keys to other microservices
+relationship OneToMany {
+  Company{historicalPrices} to HistoricalPrice{company(symbol)},
+  Company{financials} to Financial{company(symbol)},
+  Company{recommendations} to Recommendation{company(symbol)},
+  Company{peers} to PeerCompany{company(symbol)}
+}
+
+// =====================================================================
+// NEWS SERVICE - Internal Relationships Only
+// =====================================================================
+relationship OneToMany {
+  CompanyRef{companyNews} to CompanyNews{company(symbol)},
+  CompanyNews{entities} to NewsEntity{news(uuid)}
+}
+
+/*
+ * ===================================================================
+ * 6. MICROSERVICE MAPPING (Optional - entities already mapped in applications)
+ * ===================================================================
+ */
+
+// Entities are already mapped in the application definitions above
+// This section is kept for reference but can be removed
+
+/*
+ * ===================================================================
+ * 7. GENERAL SETTINGS
+ * ===================================================================
+ */
+
+dto * with mapstruct
+service * with serviceClass
+paginate * with pagination
