@@ -1,0 +1,4 @@
+org.springframework.test.context.ContextCustomizerFactory = \
+    com.stockapp.gateway.config.\
+    TestContainersSpringContextCustomizerFactory,com.stockapp.gateway.config.\
+    KafkaTestContainersSpringContextCustomizerFactory

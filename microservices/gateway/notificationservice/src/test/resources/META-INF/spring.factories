@@ -1,0 +1,4 @@
+org.springframework.test.context.ContextCustomizerFactory = \
+    com.stockapp.notificationservice.config.\
+    TestContainersSpringContextCustomizerFactory,com.stockapp.\
+    notificationservice.config.KafkaTestContainersSpringContextCustomizerFactory

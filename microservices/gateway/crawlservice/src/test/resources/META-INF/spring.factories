@@ -1,0 +1,4 @@
+org.springframework.test.context.ContextCustomizerFactory = \
+    com.stockapp.crawlservice.config.\
+    TestContainersSpringContextCustomizerFactory,com.stockapp.crawlservice.\
+    config.KafkaTestContainersSpringContextCustomizerFactory
