@@ -1,6 +1,8 @@
-# ⚠️ Fix Maven Wrapper Error on Windows
+## ⚠️ Common Build Issues on Windows
 
-## Vấn đề
+## Vấn đề 1: Maven Wrapper Error
+
+### Triệu chứng
 
 Khi clone dự án về máy Windows và chạy:
 ```bash
@@ -83,3 +85,46 @@ File `.gitattributes` đã được thêm vào dự án để force LF cho tất
 ---
 
 **Lưu ý**: Các service khác (userservice, stockservice, newsservice, ...) cũng có thể gặp lỗi tương tự. Áp dụng **Cách 1** sẽ fix cho tất cả services cùng lúc.
+
+---
+
+## Vấn đề 2: Missing Component Files (FIXED ✅)
+
+### Triệu chứng
+
+Build bị lỗi:
+```
+Error: Module not found: Error: Can't resolve './logs/logs.component'
+Cannot find module './logs/logs.component' or its corresponding type declarations
+```
+
+### Nguyên nhân
+
+File `.gitignore` trước đó có dòng `logs/` làm Git ignore toàn bộ thư mục `logs`, bao gồm cả source code components trong `src/main/webapp/app/admin/logs/`.
+
+### Trạng thái
+
+✅ **Đã fix trong commit `bae9298`**:
+- Cập nhật `.gitignore` để chỉ ignore file log (*.log), không ignore thư mục source code
+- Đã thêm tất cả file logs component vào Git
+- Pull code mới nhất sẽ có đầy đủ file
+
+### Kiểm tra
+
+Sau khi pull code mới:
+```bash
+cd microservices/gateway
+ls -la src/main/webapp/app/admin/logs/
+
+# Phải thấy các file:
+# - logs.component.ts
+# - logs.component.html
+# - logs.service.ts
+# - log.model.ts
+```
+
+Nếu vẫn thiếu file, chạy:
+```bash
+git pull origin master
+git checkout -- .
+```
